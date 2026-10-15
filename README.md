@@ -117,7 +117,43 @@ const more = document.querySelector('[data-weapp-agent-id*="-morebtn_"]');
 const bar  = more && more.closest('.ui-title-right-container');
 ```
 
-### 4. Degradation is silent
+**Horizontally it follows the bar too.** When the workflow form lives in a *centred* dialog
+(`/sp/ebdapp/build/…?openSource=create`) the action bar's right edge is far from the viewport's
+right edge, so a fixed `right: 16px` leaves the entry floating over an unrelated panel:
+
+| | bar right | launcher right |
+| --- | --- | --- |
+| fixed `right: 16px` | `1456` | `2117` ❌ (661 px away) |
+| measured from the bar | `1456` | `1456` ✅ |
+
+### 4. Never let the platform think you clicked outside
+
+Workflow forms are often hosted in a **right-hand drawer** (`.ui-dialog-wrap-right`) that closes on
+"click outside". The guide lives on `document.body`, so clicking its own button counted as an
+outside click and **closed the drawer while the user was reading it**.
+
+The fix is to swallow the pointer events on our own nodes at the earliest point that exists —
+`window` capture — and run the interaction from there:
+
+```js
+// mousedown / mouseup / pointerdown / pointerup / touchstart / touchend / click
+window.addEventListener(type, onWindowCapture, true);
+
+function onWindowCapture(event) {
+  if (!root.contains(event.target)) return;   // outside our UI → let it through untouched
+  event.stopPropagation();                    // the platform never sees this one
+  if (launcher.contains(event.target)) setOpen(!open);
+  else if (closeBtn.contains(event.target)) setOpen(false);
+}
+```
+
+`window` capture runs before any `document`-level **or** React-root-level listener, so the platform's
+outside-click check can never match. `stopPropagation()` does not touch default browser behaviour, so
+scrolling, text selection and scrollbar dragging inside the panel keep working. Measured on a live
+page: **0** of the events fired on the guide reach `document`, while a click on any other element
+still does — the platform's own outside-click handling keeps working everywhere else.
+
+### 5. Degradation is silent
 
 | Situation | Behaviour |
 | --- | --- |

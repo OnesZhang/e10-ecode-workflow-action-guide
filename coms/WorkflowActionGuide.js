@@ -30,6 +30,8 @@ const BAR_SELECTORS = ['.ui-title-right-container', '.ui-title-right', '.ui-titl
 const MENU_SELECTOR = '[data-weapp-agent-id][data-weapp-agent-type="Menu"]';
 /** 流程「更多」菜单的 agent id 固定带此后缀，用来反查它所在的动作条。 */
 const MORE_MENU_SELECTOR = '[data-weapp-agent-id*="-morebtn_"]';
+/** 需要在本应用节点上被拦下的指针事件（避免被平台当成「点击抽屉外部」）。 */
+const SWALLOWED_EVENTS = ['mousedown', 'mouseup', 'pointerdown', 'pointerup', 'touchstart', 'touchend', 'click'];
 const TICK_INTERVAL = 800;
 
 /**
@@ -159,6 +161,7 @@ ACTIONS.forEach(entry => {
 let root = null;
 let panel = null;
 let launcher = null;
+let closeBtn = null;
 let signature = '';
 let open = false;
 let timer = null;
@@ -362,17 +365,25 @@ function place() {
   if (!root || !launcher || !panel) return;
   const bar = findBar();
   let bottom = 0;
+  let right = 16;
   if (bar) {
+    const barRect = bar.getBoundingClientRect();
     const buttons = bar.querySelectorAll('button');
     for (let i = 0; i < buttons.length; i += 1) {
       const rect = buttons[i].getBoundingClientRect();
       if (rect.height > 0 && rect.bottom > bottom) bottom = rect.bottom;
     }
-    if (!bottom) bottom = bar.getBoundingClientRect().bottom;
+    if (!bottom) bottom = barRect.bottom;
+    // 横向也要贴动作条：流程表单可能落在「居中弹窗 / 右侧抽屉」里（实测
+    // /sp/ebdapp/build/…?openSource=create 是居中弹窗，动作条右边缘离视口右边缘 677px），
+    // 固定 right:16px 会让入口飘到页面最右侧，看起来和流程表单没关系。
+    if (barRect.width > 0) right = Math.max(8, Math.round(window.innerWidth - barRect.right));
   }
   const top = bottom > 0 ? Math.round(bottom + 8) : 52;
   launcher.style.top = top + 'px';
+  launcher.style.right = right + 'px';
   panel.style.top = (top + 36) + 'px';
+  panel.style.right = right + 'px';
 }
 
 /** 只清理本模块注入的 DOM，监听器与定时器在页面生命周期内保留，用于跟随路由变化。 */
@@ -381,8 +392,36 @@ function clearDom() {
   root = null;
   panel = null;
   launcher = null;
+  closeBtn = null;
   signature = '';
   open = false;
+}
+
+/**
+ * 落在本应用节点上的指针事件：交给自己处理，并在最外层（window 捕获）拦下，不让平台看见。
+ *
+ * 为什么必须拦：流程表单可能是从右侧滑出的抽屉/弹窗（实测 `.ui-dialog-wrap-right`），
+ * 平台把「点击抽屉之外」当作关闭动作。本应用的节点挂在 body 上，点自己的入口会被判成
+ * 「点了外面」，于是抽屉连同正在看的流程一起被关掉。
+ *
+ * 为什么在 window 捕获阶段：捕获顺序是 window → document → … → target，
+ * 挂在 window 上比平台任何 document/元素级监听都早，且 `stopPropagation()` 不影响浏览器
+ * 默认行为（滚动、选中、滚动条拖动照常）。
+ */
+function onWindowCapture(event) {
+  if (!root || !root.contains(event.target)) return;
+  event.stopPropagation();
+  if (event.type !== 'click') return;
+  if (launcher && launcher.contains(event.target)) {
+    setOpen(!open);
+    if (typeof launcher.focus === 'function') launcher.focus();
+    return;
+  }
+  if (closeBtn && closeBtn.contains(event.target)) {
+    setOpen(false);
+    return;
+  }
+  // 面板内部的其它点击：保持展开即可
 }
 
 function render(topRows, moreRows, text) {
@@ -395,27 +434,17 @@ function render(topRows, moreRows, text) {
   launcher.setAttribute('aria-label', text.title);
   launcher.appendChild(el('span', 'wfg-launcher-icon', 'i'));
   launcher.appendChild(el('span', 'wfg-launcher-text', text.title));
-  launcher.addEventListener('click', event => {
-    event.preventDefault();
-    event.stopPropagation();
-    setOpen(!open);
-  });
 
   panel = el('div', 'wfg-panel');
   const head = el('div', 'wfg-head');
   const headText = el('div', 'wfg-head-text');
   headText.appendChild(el('div', 'wfg-title', text.title));
   head.appendChild(headText);
-  const close = el('button', 'wfg-close', '\u2715');
-  close.type = 'button';
-  close.title = text.close;
-  close.setAttribute('aria-label', text.close);
-  close.addEventListener('click', event => {
-    event.preventDefault();
-    event.stopPropagation();
-    setOpen(false);
-  });
-  head.appendChild(close);
+  closeBtn = el('button', 'wfg-close', '\u2715');
+  closeBtn.type = 'button';
+  closeBtn.title = text.close;
+  closeBtn.setAttribute('aria-label', text.close);
+  head.appendChild(closeBtn);
   panel.appendChild(head);
 
   const body = el('div', 'wfg-body');
@@ -424,7 +453,6 @@ function render(topRows, moreRows, text) {
     if (sections[i]) body.appendChild(sections[i]);
   }
   panel.appendChild(body);
-  panel.addEventListener('click', event => event.stopPropagation());
 
   root.appendChild(launcher);
   root.appendChild(panel);
@@ -490,6 +518,9 @@ export default function bootstrap() {
   };
   document.addEventListener('keydown', onKeyDown, true);
   document.addEventListener('click', onDocumentClick, true);
+  for (let i = 0; i < SWALLOWED_EVENTS.length; i += 1) {
+    window.addEventListener(SWALLOWED_EVENTS[i], onWindowCapture, true);
+  }
 
   timer = window.setInterval(tick, TICK_INTERVAL);
   tick();
