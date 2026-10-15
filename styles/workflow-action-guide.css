@@ -11,14 +11,14 @@
   right: 16px;
   z-index: 1050;
   box-sizing: border-box;
-  width: 28px;
+  min-width: 28px;
   height: 28px;
-  padding: 0;
-  display: flex;
+  padding: 0 11px 0 8px;
+  display: inline-flex;
   align-items: center;
-  justify-content: center;
+  gap: 5px;
   border: 1px solid #c9cdd4;
-  border-radius: 50%;
+  border-radius: 999px;
   background: #fff;
   color: #4e5969;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
@@ -35,7 +35,14 @@
 }
 
 .wfg-launcher-icon {
-  font: italic 700 14px/1 Georgia, "Times New Roman", serif;
+  font: italic 700 13px/1 Georgia, "Times New Roman", serif;
+}
+
+.wfg-launcher-text {
+  font-size: 12px;
+  font-weight: 600;
+  line-height: 1;
+  white-space: nowrap;
 }
 
 .wfg-panel {

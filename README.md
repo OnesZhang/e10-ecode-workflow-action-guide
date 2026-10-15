@@ -18,7 +18,8 @@ domain-specific, and — worst of all — **an administrator can rename any of t
 
 ## What this app does
 
-- Adds a small floating **`i`** button just below the workflow action bar.
+- Adds a small **capsule** button just below the workflow action bar — the letter `i` plus a localized
+  label (`操作说明` in Chinese, `Action Guide` in English).
 - Clicking it opens a panel with two groups: **Top-right buttons** and **"More" menu**, each row
   being `name + one-sentence explanation`.
 - The **name shown is the platform's current title**, so if an administrator renames
@@ -188,6 +189,11 @@ node <e10-devtools>/ecode-cli.mjs package import --file .target/<appId>.zip --pr
 > import `--auto-publish` flag (or the publish action in the e-code console).
 
 ## Customising
+
+**Launcher shape and label.** The capsule is `.wfg-launcher` in `styles/workflow-action-guide.css`
+(`border-radius: 999px`, `height: 28px`); the `i` glyph is `.wfg-launcher-icon` and the label is
+`.wfg-launcher-text`, whose text comes from `I18N[lang].title` in the module. Drop the
+`.wfg-launcher-text` span to get a bare icon button again.
 
 **Add an operation to the guide.** Look up its `menutype` on any workflow page:
 

@@ -364,6 +364,7 @@ function render(topRows, moreRows, text) {
   launcher.title = text.title;
   launcher.setAttribute('aria-label', text.title);
   launcher.appendChild(el('span', 'wfg-launcher-icon', 'i'));
+  launcher.appendChild(el('span', 'wfg-launcher-text', text.title));
   launcher.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
