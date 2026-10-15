@@ -97,6 +97,26 @@ launcher.style.top = Math.round(bottom + 8) + 'px';
 panel.style.top    = Math.round(bottom + 8 + 36) + 'px';
 ```
 
+**…but first you have to pick the right action bar.** A page can contain several
+`.ui-title-right-container` elements and the first one in document order is *not* necessarily the
+workflow one. On `/sp/ebdpage/view/…` (an e-builder page hosting the workflow form in a
+slide-out panel) there are three of them, and the first belongs to the embedded form, with two
+buttons that are hidden — anchoring there put the entry **143 px down the page**:
+
+| Candidate | rect | Resulting `top` |
+| --- | --- | --- |
+| first `.ui-title-right-container` (embedded form header) | `1197,105 896×30` | `143` ❌ |
+| the one owning the workflow "More" menu | `1700,0 422×54` | `50` ✅ |
+
+The workflow More menu carries a stable marker in its agent id — it always ends with
+`-morebtn_` — so the module finds the bar by *that*, and only falls back to "first bar with a
+visible button" when there is none:
+
+```js
+const more = document.querySelector('[data-weapp-agent-id*="-morebtn_"]');
+const bar  = more && more.closest('.ui-title-right-container');
+```
+
 ### 4. Degradation is silent
 
 | Situation | Behaviour |

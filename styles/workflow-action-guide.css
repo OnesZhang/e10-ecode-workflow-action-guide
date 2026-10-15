@@ -17,21 +17,21 @@
   display: inline-flex;
   align-items: center;
   gap: 5px;
-  border: 1px solid #c9cdd4;
+  border: 1px solid #1677ff;
   border-radius: 999px;
   background: #fff;
-  color: #4e5969;
+  color: #1677ff;
   font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
   cursor: pointer;
-  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.12);
+  box-shadow: 0 0 0 3px rgba(22, 119, 255, 0.14), 0 0 12px rgba(22, 119, 255, 0.35);
   transition: color 0.15s, border-color 0.15s, box-shadow 0.15s;
 }
 
 .wfg-launcher:hover,
 .wfg-open .wfg-launcher {
-  color: #1677ff;
-  border-color: #1677ff;
-  box-shadow: 0 3px 10px rgba(22, 119, 255, 0.25);
+  color: #0958d9;
+  border-color: #0958d9;
+  box-shadow: 0 0 0 4px rgba(22, 119, 255, 0.2), 0 0 18px rgba(22, 119, 255, 0.5);
 }
 
 .wfg-launcher-icon {

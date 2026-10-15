@@ -28,6 +28,8 @@
 const ROOT_ID = 'wfg-guide-root';
 const BAR_SELECTORS = ['.ui-title-right-container', '.ui-title-right', '.ui-title'];
 const MENU_SELECTOR = '[data-weapp-agent-id][data-weapp-agent-type="Menu"]';
+/** 流程「更多」菜单的 agent id 固定带此后缀，用来反查它所在的动作条。 */
+const MORE_MENU_SELECTOR = '[data-weapp-agent-id*="-morebtn_"]';
 const TICK_INTERVAL = 800;
 
 /**
@@ -198,11 +200,39 @@ function isWorkflowPage() {
   }
 }
 
-/** 动作条容器：优先专用容器，退化到标题行（不同页面形态的兜底）。 */
+function isVisible(node) {
+  if (!node) return false;
+  const rect = node.getBoundingClientRect();
+  return rect.width > 0 && rect.height > 0;
+}
+
+/**
+ * 动作条容器。
+ * 同一个页面上可能同时存在多个 `.ui-title-right-container`（e-builder 页面里嵌的表单、
+ * 右滑面板自己都可能有），**按文档顺序取第一个并不等于流程动作条** —— 实测在
+ * `/sp/ebdpage/view/…` 上会取到嵌在表单里那排不可见的按钮，入口因此被推到页面中部。
+ * 流程「更多」菜单的 agent id 固定带 `-morebtn_` 后缀，用它反查所在动作条最可靠；
+ * 反查不到时退化为「第一个含可见按钮的动作条」。
+ */
 function findBar() {
+  const moreMenu = document.querySelector(MORE_MENU_SELECTOR);
+  if (isVisible(moreMenu)) {
+    const owner = moreMenu.closest('.ui-title-right-container')
+      || moreMenu.closest('.ui-title-right')
+      || moreMenu.closest('.ui-title');
+    if (isVisible(owner)) return owner;
+  }
   for (let i = 0; i < BAR_SELECTORS.length; i += 1) {
-    const node = document.querySelector(BAR_SELECTORS[i]);
-    if (node) return node;
+    const nodes = document.querySelectorAll(BAR_SELECTORS[i]);
+    for (let j = 0; j < nodes.length; j += 1) {
+      const node = nodes[j];
+      if (!isVisible(node)) continue;
+      const buttons = node.querySelectorAll('button');
+      for (let k = 0; k < buttons.length; k += 1) {
+        const button = buttons[k];
+        if (isVisible(button) && getComputedStyle(button).visibility !== 'hidden') return node;
+      }
+    }
   }
   return null;
 }
