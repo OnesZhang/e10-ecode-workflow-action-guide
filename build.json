@@ -1,0 +1,21 @@
+{
+  "appId": "",
+  "appUUID": "",
+  "id": "",
+  "name": "workflow-action-guide",
+  "lockFlag": "n",
+  "officialFlag": "n",
+  "systemFlag": "n",
+  "debugFlag": "n",
+  "codes": {
+    "entry.js": {
+      "state": "y"
+    },
+    "styles/workflow-action-guide.css": {
+      "state": "y"
+    },
+    "coms/WorkflowActionGuide.js": {
+      "state": "n"
+    }
+  }
+}

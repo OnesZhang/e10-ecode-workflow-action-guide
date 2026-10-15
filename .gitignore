@@ -1,0 +1,8 @@
+# OS / editor
+.DS_Store
+Thumbs.db
+*.swp
+
+# Local build / sync artifacts (may contain session state, never commit)
+.target/
+.ecode-runtime/
