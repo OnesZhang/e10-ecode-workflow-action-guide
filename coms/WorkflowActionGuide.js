@@ -1,8 +1,14 @@
 /**
  * Workflow Action Guide —— 业务模块
  *
- * 在 PC 端 `/sp/workflow/` 页面右上角挂一个悬浮的 “i” 入口，点开后按当前用户语言
- * 说明「右上角动作按钮」和「更多菜单」里每一项是什么操作。
+ * 在**流程页**右上角挂一个悬浮的 “i” 入口，点开后按当前用户语言说明
+ * 「右上角动作按钮」和「更多菜单」里每一项是什么操作。
+ *
+ * 页面判定：不看 URL，看平台有没有给当前页面注入流程上下文
+ * （`getFlowPageSDK().baseStore.baseParam.workflowId`）。这样经典流程详情
+ * `/sp/workflow/flowpage/view/{id}` 与 e-builder 流程卡片
+ * `/sp/ebdfpage/card/…/{id}` 是同一种页面都能命中，而 `/sp/workflow/newflow`、
+ * `/sp/ebdapp/detail/…/flow/nodeInfo` 这类非实例页不会命中。
  *
  * 绑定方式（关键）：动作的稳定标识是平台的 `menutype`（SUBMIT / SAVE_DATA / DELETE …），
  * **不是按钮名称**。名称可以被管理员自定义、也会随界面语言变化，menutype 不变。
@@ -11,7 +17,7 @@
  * 1. 首选官方口子 `window.weappWorkflow.getFlowPageSDK().baseStore.operMenus`
  *    （平台 JS-SDK 文档：查看当前流程下操作按钮清单），字段含
  *    `menutype / title / istop / useable / orderid`；`istop===1` 是右上角按钮，其余进「更多」。
- * 2. 口子不可用时降级：右上角按钮读 `.ui-title-right-container button` 文案，
+ * 2. 口子不可用时降级：右上角按钮读动作条内 button 文案，
  *    「更多」菜单项读容器内 Menu 组件的 `data-weapp-agent-id` 再走
  *    `__WEAPP_AGENT_BRIDGE__.describe(id)`（不展开菜单），此时按名称匹配。
  *
@@ -19,9 +25,8 @@
  * 面板里显示的名称优先用平台实际标题（改过名就跟着显示改后的名字，与屏幕一致）。
  */
 
-const PATH_PREFIX = '/sp/workflow/';
 const ROOT_ID = 'wfg-guide-root';
-const BAR_SELECTOR = '.ui-title-right-container';
+const BAR_SELECTORS = ['.ui-title-right-container', '.ui-title-right', '.ui-title'];
 const MENU_SELECTOR = '[data-weapp-agent-id][data-weapp-agent-type="Menu"]';
 const TICK_INTERVAL = 800;
 
@@ -176,6 +181,32 @@ function currentLang() {
   }
 }
 
+/**
+ * 平台是否为当前页面注入了流程上下文（判据与 entry.js 一致）。
+ * 不看 URL：经典流程详情 `/sp/workflow/flowpage/*` 与 e-builder 流程卡片
+ * `/sp/ebdfpage/card/*` 是同一类页面，而 `/sp/workflow/newflow`、
+ * `/sp/ebdapp/detail/…/flow/nodeInfo` 不是。
+ */
+function isWorkflowPage() {
+  try {
+    const wf = window.weappWorkflow;
+    const sdk = wf && typeof wf.getFlowPageSDK === 'function' ? wf.getFlowPageSDK() : null;
+    const param = sdk && sdk.baseStore ? sdk.baseStore.baseParam : null;
+    return !!(param && String(param.workflowId || '').trim());
+  } catch (error) {
+    return false;
+  }
+}
+
+/** 动作条容器：优先专用容器，退化到标题行（不同页面形态的兜底）。 */
+function findBar() {
+  for (let i = 0; i < BAR_SELECTORS.length; i += 1) {
+    const node = document.querySelector(BAR_SELECTORS[i]);
+    if (node) return node;
+  }
+  return null;
+}
+
 /** 平台官方口子：当前流程的操作按钮清单（含稳定标识 menutype）。 */
 function readOperMenus() {
   try {
@@ -206,7 +237,7 @@ function readMenuLabels(wrap) {
 
 /** 读取当前页面真实的动作清单；没有动作容器时返回 null。 */
 function detect() {
-  const bar = document.querySelector(BAR_SELECTOR);
+  const bar = findBar();
   if (!bar) return null;
 
   const menuWrap = bar.querySelector(MENU_SELECTOR);
@@ -299,7 +330,7 @@ function setOpen(next) {
  */
 function place() {
   if (!root || !launcher || !panel) return;
-  const bar = document.querySelector(BAR_SELECTOR);
+  const bar = findBar();
   let bottom = 0;
   if (bar) {
     const buttons = bar.querySelectorAll('button');
@@ -375,7 +406,7 @@ function render(topRows, moreRows, text) {
 function tick() {
   // 平台在页面初始化/重渲染时可能整块替换节点，先做自愈，避免“入口消失后不再回来”
   if (root && !document.body.contains(root)) clearDom();
-  if (window.location.pathname.indexOf(PATH_PREFIX) !== 0) {
+  if (!isWorkflowPage()) {
     if (root) clearDom();
     return;
   }

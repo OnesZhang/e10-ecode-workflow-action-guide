@@ -31,6 +31,21 @@ domain-specific, and — worst of all — **an administrator can rename any of t
 
 ## How it works
 
+### Detecting a workflow page
+
+URL is not a usable signal (see [Scope](#scope-which-pages-it-appears-on)), so the entry asks the
+platform whether it injected a workflow context:
+
+```js
+const sdk   = window.weappWorkflow.getFlowPageSDK();
+const param = sdk && sdk.baseStore ? sdk.baseStore.baseParam : null;
+return !!(param && String(param.workflowId || '').trim());
+```
+
+`entry.js` polls this (1 s) until it matches, then loads the module once and stops polling; the module
+re-evaluates the same predicate on every 800 ms tick, so SPA navigation into or out of a workflow page
+mounts/unmounts the guide by itself.
+
 ### 1. Bind to the operation code, never to the label
 
 The platform exposes the current operation list through its JS SDK:
@@ -87,7 +102,7 @@ panel.style.top    = Math.round(bottom + 8 + 36) + 'px';
 | --- | --- |
 | `getFlowPageSDK()` unavailable | Falls back to reading the DOM: `.ui-title-right-container button` for the top row, and the menu items through `__WEAPP_AGENT_BRIDGE__.describe(menuId)` (no need to open the menu), matched **by name** |
 | An operation is not in the table | That row is simply not rendered — nothing is invented |
-| No action bar / not a `/sp/workflow/` page | No node injected, nothing observable on the page |
+| No action bar, or no workflow context | No node injected, nothing observable on the page |
 | The platform replaces the DOM block | The entry re-mounts itself on the next tick |
 | The lazy chunk fails to load | `entry.js` logs and leaves the page exactly as it was |
 
@@ -116,13 +131,38 @@ e10-ecode-workflow-action-guide/
 `1050` (launcher) / `1040` (panel): above the platform's dropdown layer (`999`), below platform
 dialogs — so the guide never covers a dialog and a dropdown never covers the guide.
 
-## Scope
+## Scope: which pages it appears on
 
-- PC workflow pages under `/sp/workflow/` (the per-request action bar).
-- Workflow **list** pages (`/workflow/list/center`) have no such action bar and no `operMenus`,
-  so nothing is injected there by design.
-- Verified against e-cology10 with `@weapp/ecodesdk` 0.1.54, `@weapp/ui` 0.0.389-hotfix11 and
-  agent bridge 0.2.0 (read from `weappEcodesdk.version` / `weappUi.version` at runtime).
+**Not by URL — by whether the platform injected a workflow context for the page:**
+
+```js
+window.weappWorkflow.getFlowPageSDK().baseStore.baseParam.workflowId   // present ⇒ it is a workflow page
+```
+
+The same workflow can live at very different URLs, and the same URL prefix can hold pages that are
+*not* workflow requests, so URL matching is a dead end:
+
+| Page | URL | `baseStore` | `baseParam.workflowId` | Guide |
+| --- | --- | --- | --- | --- |
+| Classic workflow detail | `/sp/workflow/flowpage/view/{requestId}` | ✅ | ✅ | shows |
+| e-builder workflow card | `/sp/ebdfpage/card/0/{objectId}/{requestId}` | ✅ | ✅ | shows |
+| Submit-application page | `/sp/workflow/newflow` | ✗ | — | nothing |
+| Workflow list | `/workflow/list/mine`, `/workflow/list/center` | ✗ | — | nothing |
+| e-builder designer | `/sp/ebdapp/detail/…/flow/nodeInfo` | ✗ | — | nothing |
+| Portal | `/portal/view/…` | — | — | nothing |
+
+Two traps worth knowing, both measured:
+
+- **`getFlowPageSDK()` always returns an object** — even on the portal and on list pages. It only
+  proves the module is loaded, so it cannot be used as the test.
+- **The action bar is not a signal either** — the e-builder *designer* also renders
+  `.ui-title-right-container`.
+
+Because the check is about workflow context rather than a path, new page shapes (cards, dialogs,
+custom containers) are covered automatically.
+
+Verified against e-cology10 with `@weapp/ecodesdk` 0.1.54, `@weapp/ui` 0.0.389-hotfix11 and
+agent bridge 0.2.0 (read from `weappEcodesdk.version` / `weappUi.version` at runtime).
 
 ## Build & deploy
 
@@ -192,6 +232,9 @@ the panel actually prints.
   （实测容器比按钮低 13px）。
 - **降级是静默的**：拿不到 `getFlowPageSDK()` 时退回读 DOM + `__WEAPP_AGENT_BRIDGE__.describe()`
   按名称匹配；表里没有的操作不显示、不臆造；页面没有动作条就一个节点都不注入。
-- **生效范围**：PC 端 `/sp/workflow/` 下的流程页；流程列表页（`/workflow/list/center`）没有这种
-  逐单动作条，也不注入。
+- **生效范围**：**不看 URL**，看平台有没有给当前页面注入流程上下文
+  （`getFlowPageSDK().baseStore.baseParam.workflowId`）—— 经典流程详情 `/sp/workflow/flowpage/*`
+  和 e-builder 流程卡片页 `/sp/ebdfpage/card/*` 都会命中，而 `/sp/workflow/newflow`、
+  `/workflow/list/*`、e-builder 设计器页都不会。
+  （实测：`getFlowPageSDK()` 在任何页面都返回对象、设计器页也有动作条，两者都不能拿来判断。）
 - **层级**：入口 `1050`、面板 `1040`（高于平台下拉 `999`，低于平台弹窗）。
